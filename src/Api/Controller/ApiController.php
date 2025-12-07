@@ -6,6 +6,7 @@ namespace JulienLinard\Api\Controller;
 
 use JulienLinard\Core\Controller\Controller;
 use JulienLinard\Router\Response;
+use JulienLinard\Router\Request;
 use JulienLinard\Api\Serializer\JsonSerializer;
 use JulienLinard\Api\Exception\ApiException;
 use JulienLinard\Api\Exception\NotFoundException;
@@ -33,12 +34,16 @@ abstract class ApiController extends Controller
     /**
      * Liste toutes les entités (GET /api/resource)
      * 
-     * @param array<string, mixed> $queryParams Paramètres de requête (pagination, filtres)
+     * @param Request|array<string, mixed> $requestOrParams Requête HTTP ou paramètres de requête (pagination, filtres)
      * @return Response
      */
-    public function index(array $queryParams = []): Response
+    public function index(Request|array $requestOrParams = []): Response
     {
         try {
+            $queryParams = $requestOrParams instanceof Request 
+                ? $requestOrParams->getQueryParams() 
+                : (is_array($requestOrParams) ? $requestOrParams : []);
+            
             $entities = $this->getAll($queryParams);
             $data = $this->serializer->serialize($entities, ['read']);
 
@@ -54,13 +59,21 @@ abstract class ApiController extends Controller
     /**
      * Récupère une entité par son ID (GET /api/resource/{id})
      * 
-     * @param int|string $id Identifiant de l'entité
+     * @param Request|int|string $requestOrId Requête HTTP ou identifiant de l'entité
      * @return Response
      */
-    public function show(int|string $id): Response
+    public function show(Request|int|string $requestOrId): Response
     {
         try {
-            $entity = $this->getOne($id);
+            $id = $requestOrId instanceof Request 
+                ? $requestOrId->getRouteParam('id') 
+                : $requestOrId;
+            
+            if ($id === null) {
+                throw new \InvalidArgumentException('ID manquant dans la route');
+            }
+            
+            $entity = $this->getOne((int)$id);
             
             if ($entity === null) {
                 throw new NotFoundException("Ressource avec l'ID {$id} introuvable");
@@ -79,12 +92,20 @@ abstract class ApiController extends Controller
     /**
      * Crée une nouvelle entité (POST /api/resource)
      * 
-     * @param array<string, mixed> $data Données de l'entité
+     * @param Request|array<string, mixed> $requestOrData Requête HTTP ou données de l'entité
      * @return Response
      */
-    public function create(array $data): Response
+    public function create(Request|array $requestOrData): Response
     {
         try {
+            $data = $requestOrData instanceof Request 
+                ? $this->extractDataFromRequest($requestOrData)
+                : $requestOrData;
+            
+            if (empty($data)) {
+                throw new \InvalidArgumentException('Données manquantes');
+            }
+            
             $entity = $this->createEntity($data);
             $this->save($entity);
 
@@ -99,14 +120,28 @@ abstract class ApiController extends Controller
     /**
      * Met à jour une entité (PUT /api/resource/{id})
      * 
-     * @param int|string $id Identifiant de l'entité
-     * @param array<string, mixed> $data Données à mettre à jour
+     * @param Request|int|string $requestOrId Requête HTTP ou identifiant de l'entité
+     * @param array<string, mixed>|null $data Données à mettre à jour (optionnel si Request fourni)
      * @return Response
      */
-    public function update(int|string $id, array $data): Response
+    public function update(Request|int|string $requestOrId, ?array $data = null): Response
     {
         try {
-            $entity = $this->getOne($id);
+            if ($requestOrId instanceof Request) {
+                $id = $requestOrId->getRouteParam('id');
+                if ($id === null) {
+                    throw new \InvalidArgumentException('ID manquant dans la route');
+                }
+                $data = $this->extractDataFromRequest($requestOrId);
+            } else {
+                $id = $requestOrId;
+            }
+            
+            if ($data === null || empty($data)) {
+                throw new \InvalidArgumentException('Données manquantes');
+            }
+            
+            $entity = $this->getOne((int)$id);
             
             if ($entity === null) {
                 throw new NotFoundException("Ressource avec l'ID {$id} introuvable");
@@ -128,13 +163,21 @@ abstract class ApiController extends Controller
     /**
      * Supprime une entité (DELETE /api/resource/{id})
      * 
-     * @param int|string $id Identifiant de l'entité
+     * @param Request|int|string $requestOrId Requête HTTP ou identifiant de l'entité
      * @return Response
      */
-    public function delete(int|string $id): Response
+    public function delete(Request|int|string $requestOrId): Response
     {
         try {
-            $entity = $this->getOne($id);
+            $id = $requestOrId instanceof Request 
+                ? $requestOrId->getRouteParam('id') 
+                : $requestOrId;
+            
+            if ($id === null) {
+                throw new \InvalidArgumentException('ID manquant dans la route');
+            }
+            
+            $entity = $this->getOne((int)$id);
             
             if ($entity === null) {
                 throw new NotFoundException("Ressource avec l'ID {$id} introuvable");
@@ -148,6 +191,30 @@ abstract class ApiController extends Controller
         } catch (\Throwable $e) {
             throw new ApiException('Erreur lors de la suppression de la ressource', 500, $e);
         }
+    }
+
+    /**
+     * Extrait les données JSON depuis une requête
+     * 
+     * @param Request $request
+     * @return array<string, mixed>
+     */
+    protected function extractDataFromRequest(Request $request): array
+    {
+        // Récupérer les données depuis le body
+        $data = $request->getBody();
+        if (empty($data)) {
+            // Essayer de parser le JSON depuis le body brut
+            $rawBody = $request->getRawBody();
+            if (!empty($rawBody)) {
+                $data = json_decode($rawBody, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    throw new \InvalidArgumentException('Données JSON invalides: ' . json_last_error_msg());
+                }
+            }
+        }
+
+        return is_array($data) ? $data : [];
     }
 
     /**
