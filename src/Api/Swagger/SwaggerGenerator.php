@@ -8,6 +8,11 @@ use ReflectionClass;
 use ReflectionProperty;
 use JulienLinard\Api\Annotation\ApiResource;
 use JulienLinard\Api\Annotation\ApiProperty;
+use JulienLinard\Api\Filter\ApiFilter;
+use JulienLinard\Api\Filter\SearchFilter;
+use JulienLinard\Api\Filter\DateFilter;
+use JulienLinard\Api\Filter\RangeFilter;
+use JulienLinard\Api\Filter\BooleanFilter;
 
 /**
  * Générateur de documentation OpenAPI/Swagger
@@ -98,7 +103,7 @@ class SwaggerGenerator
         // GET collection
         if (in_array('GET', $operations, true)) {
             $this->paths["/{$resourcePath}"] = [
-                'get' => $this->generateGetCollectionOperation($shortName, $schemaName, $apiResource),
+                'get' => $this->generateGetCollectionOperation($shortName, $schemaName, $apiResource, $reflection),
             ];
         }
 
@@ -185,7 +190,7 @@ class SwaggerGenerator
     /**
      * Génère l'opération GET collection
      */
-    private function generateGetCollectionOperation(string $tag, string $schemaName, ApiResource $apiResource): array
+    private function generateGetCollectionOperation(string $tag, string $schemaName, ApiResource $apiResource, ReflectionClass $reflection): array
     {
         $operation = [
             'tags' => [$tag],
@@ -233,8 +238,117 @@ class SwaggerGenerator
                 'schema' => ['type' => 'integer', 'default' => $apiResource->itemsPerPage],
             ];
         }
+        
+        // Ajouter les paramètres de tri
+        $operation['parameters'][] = [
+            'name' => 'order',
+            'in' => 'query',
+            'description' => 'Tri par propriétés (ex: order[price]=desc&order[name]=asc)',
+            'required' => false,
+            'style' => 'deepObject',
+            'explode' => true,
+            'schema' => [
+                'type' => 'object',
+                'additionalProperties' => [
+                    'type' => 'string',
+                    'enum' => ['asc', 'desc'],
+                ],
+            ],
+        ];
+        
+        // Ajouter les paramètres de filtres depuis les annotations ApiFilter
+        $filterParams = $this->generateFilterParameters($reflection);
+        foreach ($filterParams as $param) {
+            $operation['parameters'][] = $param;
+        }
 
         return $operation;
+    }
+    
+    /**
+     * Génère les paramètres de filtres depuis les annotations ApiFilter
+     */
+    private function generateFilterParameters(ReflectionClass $reflection): array
+    {
+        $parameters = [];
+        $attributes = $reflection->getAttributes(ApiFilter::class);
+        
+        foreach ($attributes as $attribute) {
+            $apiFilter = $attribute->newInstance();
+            $filterClass = $apiFilter->filterClass;
+            
+            foreach ($apiFilter->properties as $property) {
+                // Générer le paramètre selon le type de filtre
+                if ($filterClass === SearchFilter::class) {
+                    $parameters[] = [
+                        'name' => $property,
+                        'in' => 'query',
+                        'description' => "Recherche dans {$property} (ex: {$property}[partial]=value, {$property}[exact]=value)",
+                        'required' => false,
+                        'style' => 'deepObject',
+                        'explode' => true,
+                        'schema' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'exact' => ['type' => 'string'],
+                                'partial' => ['type' => 'string'],
+                                'start' => ['type' => 'string'],
+                                'end' => ['type' => 'string'],
+                                'word_start' => ['type' => 'string'],
+                            ],
+                        ],
+                    ];
+                } elseif ($filterClass === DateFilter::class) {
+                    $parameters[] = [
+                        'name' => $property,
+                        'in' => 'query',
+                        'description' => "Filtre par date pour {$property} (ex: {$property}[after]=2025-01-01)",
+                        'required' => false,
+                        'style' => 'deepObject',
+                        'explode' => true,
+                        'schema' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'exact' => ['type' => 'string', 'format' => 'date'],
+                                'before' => ['type' => 'string', 'format' => 'date'],
+                                'after' => ['type' => 'string', 'format' => 'date'],
+                            ],
+                        ],
+                    ];
+                } elseif ($filterClass === RangeFilter::class) {
+                    $parameters[] = [
+                        'name' => $property,
+                        'in' => 'query',
+                        'description' => "Filtre par plage pour {$property} (ex: {$property}[gte]=100&{$property}[lte]=500)",
+                        'required' => false,
+                        'style' => 'deepObject',
+                        'explode' => true,
+                        'schema' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'gt' => ['type' => 'number'],
+                                'gte' => ['type' => 'number'],
+                                'lt' => ['type' => 'number'],
+                                'lte' => ['type' => 'number'],
+                                'between' => ['type' => 'string', 'description' => 'Format: min,max'],
+                            ],
+                        ],
+                    ];
+                } elseif ($filterClass === BooleanFilter::class) {
+                    $parameters[] = [
+                        'name' => $property,
+                        'in' => 'query',
+                        'description' => "Filtre booléen pour {$property}",
+                        'required' => false,
+                        'schema' => [
+                            'type' => 'boolean',
+                        ],
+                    ];
+                }
+            }
+        }
+        
+        return $parameters;
     }
 
     /**

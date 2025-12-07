@@ -2,22 +2,122 @@
 
 Tous les changements notables de ce projet seront documentés dans ce fichier.
 
-## [0.1.0] - 2025-01-XX
+## [1.2.0] - 2025-01-07
 
-### Ajouté
-- Annotation `ApiResource` pour exposer des entités en API
-- Annotation `ApiProperty` pour configurer la sérialisation des propriétés
-- Annotation `Groups` pour définir les groupes de sérialisation
-- Classe `JsonSerializer` pour la sérialisation JSON automatique
-- Classe `ApiController` avec opérations CRUD standard
-- Exceptions `ApiException` et `NotFoundException`
-- Support des groupes de sérialisation (`read`, `write`)
-- Documentation complète en français et anglais
-- Exemples d'utilisation
-- Tests unitaires de base
+### ✨ Nouvelles fonctionnalités
 
-### Structure
-- `/src/Api/Annotation/` - Annotations pour les entités et propriétés
-- `/src/Api/Serializer/` - Sérialisation JSON
-- `/src/Api/Controller/` - Contrôleurs API de base
-- `/src/Api/Exception/` - Exceptions API
+#### Suite complète de tests unitaires
+
+- **78 tests unitaires** couvrant toutes les fonctionnalités
+- **136 assertions** pour garantir la qualité du code
+- Tests pour tous les filtres (SearchFilter, DateFilter, RangeFilter, BooleanFilter, OrderFilter)
+- Tests pour le FilterManager
+- Tests pour ApiValidator et ValidationException
+- Tests pour ProblemDetails et ApiException
+- Tests pour ApiController (toutes les opérations CRUD)
+- Tests pour SwaggerGenerator avec filtres
+- Mock QueryBuilder pour les tests (TestQueryBuilder)
+
+### 🔧 Améliorations
+
+- **Constantes publiques** dans les filtres pour faciliter les tests
+- **Compatibilité QueryBuilder** : Support à la fois doctrine-php et Doctrine DBAL
+- **Documentation des tests** : README.md dans le dossier tests/
+- **TestQueryBuilder** : Mock réutilisable pour tous les tests de filtres
+
+### 📝 Documentation
+
+- Ajout de `tests/README.md` avec documentation complète des tests
+- Structure des tests documentée
+- Exemples d'exécution des tests
+
+## [1.1.0] - 2025-01-07
+
+### ✨ Nouvelles fonctionnalités
+
+#### Système de filtres avancé (Phase 2)
+
+- **SearchFilter** : Recherche textuelle avec stratégies (exact, partial, start, end, word_start)
+- **DateFilter** : Filtrage par dates (exact, before, after)
+- **RangeFilter** : Filtrage par plages numériques (gt, gte, lt, lte, between)
+- **BooleanFilter** : Filtrage booléen
+- **OrderFilter** : Tri multi-colonnes (asc, desc)
+- **FilterManager** : Gestionnaire automatique des filtres
+- **Annotation ApiFilter** : Définition des filtres sur les entités
+
+#### Validation automatique (Phase 3)
+
+- **ApiValidator** : Validation automatique des données entrantes
+- **ValidationException** : Exception spécialisée pour les erreurs de validation
+- Validation des types (int, float, bool, string, array)
+- Validation des propriétés requises
+- Validation par groupes (create, update, Default)
+- Messages d'erreur structurés
+
+#### Gestion d'erreurs standardisée (Phase 5)
+
+- **ProblemDetails** : Format RFC 7807 pour les erreurs
+- **ApiException::getStatusCode()** : Méthode pour récupérer le code HTTP
+- Conversion automatique des exceptions en Problem Details
+- Support des codes HTTP standards (400, 401, 403, 404, 422, 500)
+- Extensions pour les violations de validation
+
+#### Documentation Swagger améliorée
+
+- Paramètres de filtres automatiquement documentés
+- Paramètres de tri documentés
+- Exemples de requêtes avec filtres
+- Support des filtres dans l'interface Swagger UI
+
+### 🔧 Améliorations
+
+- Intégration du FilterManager dans les contrôleurs
+- Support des union types dans le Router (Request|array)
+- Méthode `errorResponse()` dans ApiController
+- Documentation mise à jour avec exemples de filtres
+
+### 📝 Documentation
+
+- Nouveau document : `documentation/ANALYSE_API_PLATFORM.md`
+- Nouveau document : `documentation/FONCTIONNALITES_PRODUCTION.md`
+- README mis à jour avec les nouvelles fonctionnalités
+- Exemples d'utilisation des filtres
+
+### 🐛 Corrections
+
+- Correction du conflit de méthode `json()` dans SwaggerController
+- Support des union types dans le Router pour l'injection de Request
+
+## [1.0.3] - 2025-01-07
+
+### 🐛 Corrections
+
+- Renommage de `json()` en `getJson()` dans SwaggerController pour éviter le conflit avec la méthode du parent Controller
+
+## [1.0.2] - 2025-01-07
+
+### ✨ Nouvelles fonctionnalités
+
+- Support de `Request` dans `ApiController` pour intégration avec le Router
+- Toutes les méthodes acceptent maintenant `Request|type` comme premier paramètre
+- Extraction automatique des données depuis Request
+
+## [1.0.1] - 2025-01-07
+
+### ✨ Nouvelles fonctionnalités
+
+- Documentation Swagger/OpenAPI automatique
+- SwaggerGenerator pour générer la spec OpenAPI 3.0
+- SwaggerController pour servir l'interface Swagger UI
+- Export JSON et YAML
+
+## [1.0.0] - 2025-01-07
+
+### ✨ Première version
+
+- Annotations ApiResource et ApiProperty
+- Sérialisation JSON avec groupes
+- Contrôleur de base ApiController
+- Opérations CRUD automatiques
+- Pagination basique
+- Intégration avec Core PHP

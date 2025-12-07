@@ -7,9 +7,11 @@ Bibliothèque PHP pour créer des APIs REST automatiques, inspirée d'API Platfo
 - ✅ Annotations pour exposer des entités en API
 - ✅ Sérialisation JSON automatique avec groupes
 - ✅ Opérations CRUD automatiques
-- ✅ Support des relations Doctrine
-- ✅ Filtrage et pagination
-- ✅ Validation des données
+- ✅ **Advanced filtering system** : SearchFilter, DateFilter, RangeFilter, BooleanFilter, OrderFilter
+- ✅ **Automatic sorting** : Multi-column sorting via query parameters
+- ✅ **Automatic pagination** : Support for `page` and `limit` parameters
+- ✅ **Automatic validation** : Data validation with structured messages (RFC 7807)
+- ✅ **Standardized error handling** : Problem Details format (RFC 7807)
 - ✅ **Documentation Swagger/OpenAPI automatique**
 - ✅ **Interface Swagger UI pour tester l'API**
 - ✅ Intégration avec le Core PHP existant

@@ -7,9 +7,11 @@ Bibliothèque PHP pour créer des APIs REST automatiques, inspirée d'API Platfo
 - ✅ **Annotations pour exposer des entités** : Utilisez `#[ApiResource]` sur vos entités
 - ✅ **Sérialisation JSON automatique** : Avec groupes de sérialisation (`read`, `write`)
 - ✅ **Opérations CRUD automatiques** : GET, POST, PUT, DELETE prêts à l'emploi
-- ✅ **Support des relations Doctrine** : Relations ManyToOne, OneToMany, etc.
-- ✅ **Filtrage et pagination** : Support des paramètres de requête
-- ✅ **Validation des données** : Intégration avec le validateur
+- ✅ **Système de filtres avancé** : SearchFilter, DateFilter, RangeFilter, BooleanFilter, OrderFilter
+- ✅ **Tri automatique** : Tri multi-colonnes via paramètres de requête
+- ✅ **Pagination automatique** : Support des paramètres `page` et `limit`
+- ✅ **Validation automatique** : Validation des données avec messages structurés (RFC 7807)
+- ✅ **Gestion d'erreurs standardisée** : Format Problem Details (RFC 7807)
 - ✅ **Documentation Swagger/OpenAPI automatique** : Génération depuis les annotations
 - ✅ **Interface Swagger UI interactive** : Testez votre API directement dans le navigateur
 - ✅ **Intégration Core PHP** : Utilise le système de contrôleurs existant
@@ -22,13 +24,18 @@ composer require julienlinard/php-api
 
 ## 🚀 Utilisation
 
-### 1. Créer une entité avec annotations
+### 1. Créer une entité avec annotations et filtres
 
 ```php
 <?php
 
 use JulienLinard\Api\Annotation\ApiResource;
 use JulienLinard\Api\Annotation\ApiProperty;
+use JulienLinard\Api\Filter\ApiFilter;
+use JulienLinard\Api\Filter\SearchFilter;
+use JulienLinard\Api\Filter\DateFilter;
+use JulienLinard\Api\Filter\RangeFilter;
+use JulienLinard\Api\Filter\BooleanFilter;
 use JulienLinard\Doctrine\Mapping\Entity;
 use JulienLinard\Doctrine\Mapping\Id;
 use JulienLinard\Doctrine\Mapping\Column;
@@ -36,9 +43,13 @@ use JulienLinard\Doctrine\Mapping\Column;
 #[ApiResource(
     operations: ['GET', 'POST', 'PUT', 'DELETE'],
     routePrefix: '/api',
-    normalizationContext: ['groups' => ['read']],
-    denormalizationContext: ['groups' => ['write']]
+    shortName: 'users',
+    paginationEnabled: true,
+    itemsPerPage: 20
 )]
+#[ApiFilter(SearchFilter::class, properties: ['name', 'email'])]
+#[ApiFilter(DateFilter::class, properties: ['createdAt'])]
+#[ApiFilter(BooleanFilter::class, properties: ['active'])]
 #[Entity]
 class User
 {
@@ -190,13 +201,14 @@ Expose une classe en tant que ressource API.
 
 ### ApiProperty
 
-Configure la sérialisation d'une propriété.
+Configure la sérialisation et la validation d'une propriété.
 
 ```php
 #[ApiProperty(
     groups: ['read', 'write'],    // Groupes de sérialisation
     readable: true,               // Lisible via l'API
     writable: true,               // Modifiable via l'API
+    required: true,               // Propriété requise (validation)
     required: true,               // Requis
     description: 'Description'   // Description
 )]
@@ -252,6 +264,59 @@ $router->get('/api/docs.yaml', [$swaggerController, 'yaml']);  // Spec OpenAPI Y
 - ✅ **Pagination** : Paramètres de pagination automatiquement documentés
 - ✅ **Export JSON/YAML** : Récupérez la spec OpenAPI pour d'autres outils
 
+## 🔍 Filtrage et tri
+
+### Utilisation des filtres
+
+Les filtres sont automatiquement appliqués depuis les query params :
+
+```bash
+# Recherche partielle
+GET /api/products?name[partial]=laptop
+
+# Filtre par plage
+GET /api/products?price[gte]=100&price[lte]=500
+
+# Filtre booléen
+GET /api/products?active=true
+
+# Filtre par date
+GET /api/products?createdAt[after]=2025-01-01
+
+# Tri
+GET /api/products?order[price]=desc&order[name]=asc
+
+# Combinaison avec pagination
+GET /api/products?name[partial]=laptop&price[gte]=100&order[price]=desc&page=1&limit=20
+```
+
+### Stratégies de filtres
+
+- **SearchFilter** : `exact`, `partial`, `start`, `end`, `word_start`
+- **DateFilter** : `exact`, `before`, `after`
+- **RangeFilter** : `gt`, `gte`, `lt`, `lte`, `between`
+- **BooleanFilter** : `true`/`false`
+- **OrderFilter** : `asc`/`desc`
+
+## ✅ Validation
+
+La validation est automatique lors de `create()` et `update()`. Les erreurs sont au format RFC 7807 :
+
+```json
+{
+  "type": "https://example.com/problems/validation-error",
+  "title": "Validation Error",
+  "status": 422,
+  "detail": "Les données fournies sont invalides",
+  "violations": [
+    {
+      "property": "email",
+      "message": "Le champ 'email' est requis"
+    }
+  ]
+}
+```
+
 ## 🔧 Personnalisation
 
 ### Sérialisation personnalisée
@@ -261,16 +326,35 @@ $serializer = new JsonSerializer();
 $data = $serializer->serialize($user, ['read', 'admin']); // Groupes spécifiques
 ```
 
+### Filtre personnalisé
+
+```php
+class CustomFilter implements FilterInterface
+{
+    public function apply(QueryBuilder $queryBuilder, string $property, mixed $value, string $alias = 'e'): void
+    {
+        // Votre logique de filtrage
+    }
+}
+
+#[ApiFilter(CustomFilter::class, properties: ['customField'])]
+class Product { }
+```
+
 ### Gestion d'erreurs
 
 ```php
 use JulienLinard\Api\Exception\ApiException;
 use JulienLinard\Api\Exception\NotFoundException;
+use JulienLinard\Api\Exception\ValidationException;
 
 try {
     $user = $controller->show(123);
 } catch (NotFoundException $e) {
-    // 404
+    // 404 - Format Problem Details
+} catch (ValidationException $e) {
+    // 422 - Erreurs de validation
+    $violations = $e->getViolations();
 } catch (ApiException $e) {
     // Autre erreur API
 }
