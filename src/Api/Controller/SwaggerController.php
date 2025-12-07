@@ -104,7 +104,7 @@ HTML;
      * 
      * GET /api/docs.json
      */
-    public function json(): Response
+    public function getJson(): Response
     {
         $spec = $this->generator->generate(
             $this->entityClasses,
@@ -113,7 +113,7 @@ HTML;
             $this->basePath
         );
 
-        return $this->json($spec);
+        return parent::json($spec);
     }
 
     /**
