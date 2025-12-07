@@ -9,6 +9,7 @@ use ReflectionProperty;
 use JulienLinard\Api\Annotation\ApiProperty;
 use JulienLinard\Api\Annotation\Groups;
 use JulienLinard\Api\Annotation\ApiResource;
+use JulienLinard\Api\Serializer\RelationSerializer;
 
 /**
  * Sérialiseur JSON pour les entités API
@@ -17,6 +18,39 @@ use JulienLinard\Api\Annotation\ApiResource;
  */
 class JsonSerializer
 {
+    private RelationSerializer $relationSerializer;
+    private array $embedRelations = [];
+    private int $maxDepth = 1;
+
+    public function __construct()
+    {
+        $this->relationSerializer = new RelationSerializer();
+    }
+
+    /**
+     * Définit les relations à embed (inclure dans la sérialisation)
+     * 
+     * @param array<string> $relations Liste des noms de relations à embed
+     * @return self
+     */
+    public function setEmbedRelations(array $relations): self
+    {
+        $this->embedRelations = $relations;
+        return $this;
+    }
+
+    /**
+     * Définit la profondeur maximale de sérialisation
+     * 
+     * @param int $maxDepth Profondeur maximale
+     * @return self
+     */
+    public function setMaxDepth(int $maxDepth): self
+    {
+        $this->maxDepth = $maxDepth;
+        return $this;
+    }
+
     /**
      * Sérialise un objet en JSON selon les groupes spécifiés
      * 
@@ -52,9 +86,30 @@ class JsonSerializer
 
             $property->setAccessible(true);
             $value = $property->getValue($object);
+            $propertyName = $property->getName();
 
-            // Sérialiser la valeur
-            $result[$property->getName()] = $this->serializeValue($value, $groups);
+            // Vérifier si c'est une relation Doctrine
+            if ($this->relationSerializer->isRelation($property)) {
+                // Vérifier si cette relation doit être embed
+                if (empty($this->embedRelations) || in_array($propertyName, $this->embedRelations, true)) {
+                    $subresource = $this->relationSerializer->getApiSubresource($property);
+                    $maxDepth = $subresource?->maxDepth ?? $this->maxDepth;
+                    
+                    // Sérialiser la relation avec profondeur
+                    $result[$propertyName] = $this->relationSerializer->serializeRelation(
+                        $value,
+                        $groups,
+                        0,
+                        $maxDepth
+                    );
+                } else {
+                    // Relation non embed, retourner juste l'ID
+                    $result[$propertyName] = $this->extractRelationId($value);
+                }
+            } else {
+                // Sérialiser la valeur normalement
+                $result[$propertyName] = $this->serializeValue($value, $groups);
+            }
         }
 
         return $result;
@@ -144,5 +199,33 @@ class JsonSerializer
     {
         $attributes = $property->getAttributes(Groups::class);
         return !empty($attributes) ? $attributes[0]->newInstance() : null;
+    }
+
+    /**
+     * Extrait l'ID d'une relation (pour les relations non embed)
+     */
+    private function extractRelationId(mixed $value): mixed
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        if (is_array($value) || ($value instanceof \Traversable)) {
+            // Collection : retourner un tableau d'IDs
+            $ids = [];
+            foreach ($value as $item) {
+                if (is_object($item)) {
+                    $ids[] = $this->relationSerializer->serializeRelation($item, [], 0, 0);
+                }
+            }
+            return $ids;
+        }
+
+        if (is_object($value)) {
+            // Relation simple : retourner l'ID
+            return $this->relationSerializer->serializeRelation($value, [], 0, 0);
+        }
+
+        return null;
     }
 }

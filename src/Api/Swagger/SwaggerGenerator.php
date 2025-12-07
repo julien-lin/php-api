@@ -262,6 +262,18 @@ class SwaggerGenerator
             $operation['parameters'][] = $param;
         }
 
+        // Add embed parameter for relations
+        $operation['parameters'][] = [
+            'name' => 'embed',
+            'in' => 'query',
+            'description' => 'Relations à inclure (ex: embed=category,orders)',
+            'required' => false,
+            'schema' => [
+                'type' => 'string',
+                'example' => 'category,orders',
+            ],
+        ];
+
         return $operation;
     }
     

@@ -12,6 +12,9 @@ Bibliothèque PHP pour créer des APIs REST automatiques, inspirée d'API Platfo
 - ✅ **Pagination automatique** : Support des paramètres `page` et `limit`
 - ✅ **Validation automatique** : Validation des données avec messages structurés (RFC 7807)
 - ✅ **Gestion d'erreurs standardisée** : Format Problem Details (RFC 7807)
+- ✅ **Relations Doctrine** : Embedding et sous-ressources pour les relations ManyToOne/OneToMany
+- ✅ **Système d'événements** : Hooks pre/post intégrés avec core-php EventDispatcher
+- ✅ **Pagination améliorée** : Métadonnées complètes (total, pages, navigation)
 - ✅ **Documentation Swagger/OpenAPI automatique** : Génération depuis les annotations
 - ✅ **Interface Swagger UI interactive** : Testez votre API directement dans le navigateur
 - ✅ **Intégration Core PHP** : Utilise le système de contrôleurs existant
@@ -157,7 +160,14 @@ $router->delete('/api/users/{id}', [UserController::class, 'delete']);
       "createdAt": "2025-01-01T00:00:00+00:00"
     }
   ],
-  "total": 1
+  "meta": {
+    "total": 1,
+    "page": 1,
+    "limit": 20,
+    "totalPages": 1,
+    "hasNextPage": false,
+    "hasPreviousPage": false
+  }
 }
 ```
 
@@ -316,6 +326,81 @@ La validation est automatique lors de `create()` et `update()`. Les erreurs sont
   ]
 }
 ```
+
+## 🔗 Relations et sous-ressources
+
+### Embedding de relations
+
+Pour inclure des relations dans la réponse, utilisez le paramètre `embed` :
+
+```bash
+# Inclure la relation category
+GET /api/products?embed=category
+
+# Inclure plusieurs relations
+GET /api/products?embed=category,orderItems
+```
+
+### Définir une relation
+
+```php
+use JulienLinard\Doctrine\Mapping\ManyToOne;
+use JulienLinard\Api\Annotation\ApiSubresource;
+
+class Product
+{
+    // Relation ManyToOne
+    #[ManyToOne(targetEntity: Category::class)]
+    #[ApiSubresource(maxDepth: 1)]
+    public ?Category $category = null;
+    
+    // Relation OneToMany
+    #[OneToMany(targetEntity: OrderItem::class, mappedBy: 'product')]
+    #[ApiSubresource(maxDepth: 1)]
+    public array $orderItems = [];
+}
+```
+
+### Sous-ressources
+
+Accédez aux relations via des routes dédiées :
+
+```bash
+# Récupérer les orderItems d'un produit
+GET /api/products/1/orderItems
+
+# Récupérer un orderItem spécifique
+GET /api/products/1/orderItems/5
+```
+
+## 🎯 Événements API
+
+Le système d'événements est intégré avec `core-php` EventDispatcher :
+
+```php
+use JulienLinard\Core\Events\EventDispatcher;
+use JulienLinard\Api\Event\ApiEvent;
+
+$events = $app->getEvents();
+
+// Écouter la création d'une ressource
+$events->listen(ApiEvent::POST_CREATE, function(array $data) {
+    $entity = $data['entity'];
+    // Votre logique : log, notification, etc.
+});
+
+// Écouter la mise à jour
+$events->listen(ApiEvent::PRE_UPDATE, function(array $data) {
+    $entity = $data['entity'];
+    $newData = $data['data'];
+    // Vérifier permissions, valider, etc.
+});
+```
+
+Événements disponibles :
+- `api.pre_create` / `api.post_create`
+- `api.pre_update` / `api.post_update`
+- `api.pre_delete` / `api.post_delete`
 
 ## 🔧 Personnalisation
 

@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace JulienLinard\Api\Controller;
 
 use JulienLinard\Core\Controller\Controller;
+use JulienLinard\Core\Application;
+use JulienLinard\Core\Events\EventDispatcher;
 use JulienLinard\Router\Response;
 use JulienLinard\Router\Request;
 use JulienLinard\Api\Serializer\JsonSerializer;
@@ -13,6 +15,7 @@ use JulienLinard\Api\Exception\NotFoundException;
 use JulienLinard\Api\Exception\ValidationException;
 use JulienLinard\Api\Exception\ProblemDetails;
 use JulienLinard\Api\Validator\ApiValidator;
+use JulienLinard\Api\Event\ApiEvent;
 
 /**
  * Contrôleur de base pour les APIs REST
@@ -50,12 +53,35 @@ abstract class ApiController extends Controller
                 ? $requestOrParams->getQueryParams() 
                 : (is_array($requestOrParams) ? $requestOrParams : []);
             
-            $entities = $this->getAll($queryParams);
+            // Gérer l'embedding de relations
+            $embedRelations = [];
+            if (isset($queryParams['embed']) && is_string($queryParams['embed'])) {
+                $embedRelations = array_map('trim', explode(',', $queryParams['embed']));
+            }
+            $this->serializer->setEmbedRelations($embedRelations);
+            
+            // Récupérer les entités avec pagination
+            $paginationResult = $this->getAllWithPagination($queryParams);
+            $entities = $paginationResult['data'];
+            $total = $paginationResult['total'];
+            $page = $paginationResult['page'];
+            $limit = $paginationResult['limit'];
+            
             $data = $this->serializer->serialize($entities, ['read']);
+
+            // Métadonnées de pagination
+            $totalPages = (int)ceil($total / $limit);
 
             return $this->json([
                 'data' => $data,
-                'total' => count($entities),
+                'meta' => [
+                    'total' => $total,
+                    'page' => $page,
+                    'limit' => $limit,
+                    'totalPages' => $totalPages,
+                    'hasNextPage' => $page < $totalPages,
+                    'hasPreviousPage' => $page > 1,
+                ],
             ]);
         } catch (ValidationException $e) {
             throw $e;
@@ -86,6 +112,17 @@ abstract class ApiController extends Controller
             if ($entity === null) {
                 throw new NotFoundException("Ressource avec l'ID {$id} introuvable");
             }
+
+            // Gérer l'embedding de relations depuis query params
+            $queryParams = $requestOrId instanceof Request 
+                ? $requestOrId->getQueryParams() 
+                : [];
+            
+            $embedRelations = [];
+            if (isset($queryParams['embed']) && is_string($queryParams['embed'])) {
+                $embedRelations = array_map('trim', explode(',', $queryParams['embed']));
+            }
+            $this->serializer->setEmbedRelations($embedRelations);
 
             $data = $this->serializer->serialize($entity, ['read']);
 
@@ -119,8 +156,14 @@ abstract class ApiController extends Controller
             // Valider les données
             $this->validator->validate($data, $this->entityClass, ['create', 'Default']);
             
+            // Événement pre_create
+            $this->dispatchEvent(ApiEvent::PRE_CREATE, null, ['data' => $data]);
+            
             $entity = $this->createEntity($data);
             $this->save($entity);
+            
+            // Événement post_create
+            $this->dispatchEvent(ApiEvent::POST_CREATE, $entity, ['data' => $data]);
 
             $serialized = $this->serializer->serialize($entity, ['read']);
 
@@ -165,8 +208,14 @@ abstract class ApiController extends Controller
                 throw new NotFoundException("Ressource avec l'ID {$id} introuvable");
             }
 
+            // Événement pre_update
+            $this->dispatchEvent(ApiEvent::PRE_UPDATE, $entity, ['data' => $data]);
+            
             $this->updateEntity($entity, $data);
             $this->save($entity);
+            
+            // Événement post_update
+            $this->dispatchEvent(ApiEvent::POST_UPDATE, $entity, ['data' => $data]);
 
             $serialized = $this->serializer->serialize($entity, ['read']);
 
@@ -203,7 +252,13 @@ abstract class ApiController extends Controller
                 throw new NotFoundException("Ressource avec l'ID {$id} introuvable");
             }
 
+            // Événement pre_delete
+            $this->dispatchEvent(ApiEvent::PRE_DELETE, $entity);
+            
             $this->remove($entity);
+            
+            // Événement post_delete
+            $this->dispatchEvent(ApiEvent::POST_DELETE, $entity);
 
             return $this->json(['message' => 'Ressource supprimée avec succès'], 204);
         } catch (NotFoundException $e) {
@@ -235,6 +290,45 @@ abstract class ApiController extends Controller
         }
 
         return is_array($data) ? $data : [];
+    }
+
+    /**
+     * Récupère toutes les entités avec pagination
+     * 
+     * Par défaut, appelle getAll() et calcule la pagination manuellement.
+     * Peut être surchargé pour une pagination plus efficace (avec comptage séparé).
+     * 
+     * @param array<string, mixed> $queryParams Paramètres de requête
+     * @return array{data: array<object>, total: int, page: int, limit: int}
+     */
+    protected function getAllWithPagination(array $queryParams = []): array
+    {
+        $page = isset($queryParams['page']) ? max(1, (int)$queryParams['page']) : 1;
+        $limit = isset($queryParams['limit']) ? max(1, (int)$queryParams['limit']) : 20;
+        
+        // Essayer d'obtenir le total depuis getAll() si elle retourne un tableau avec 'total'
+        $result = $this->getAll($queryParams);
+        
+        // Si getAll() retourne un tableau avec les clés 'data' et 'total', l'utiliser
+        if (is_array($result) && isset($result['data']) && isset($result['total'])) {
+            return [
+                'data' => $result['data'],
+                'total' => (int)$result['total'],
+                'page' => $page,
+                'limit' => $limit,
+            ];
+        }
+        
+        // Sinon, traiter comme un tableau simple d'entités
+        $entities = is_array($result) ? $result : [];
+        $total = count($entities);
+        
+        return [
+            'data' => $entities,
+            'total' => $total,
+            'page' => $page,
+            'limit' => $limit,
+        ];
     }
 
     /**
@@ -349,5 +443,41 @@ abstract class ApiController extends Controller
     {
         $problem = ProblemDetails::fromException($exception, $baseUrl);
         return $this->json($problem->toArray(), $problem->status);
+    }
+    
+    /**
+     * Dispatch un événement API via le EventDispatcher de core-php
+     * 
+     * @param string $eventName Nom de l'événement
+     * @param object|null $entity Entité concernée
+     * @param array<string, mixed> $data Données additionnelles
+     * @return void
+     */
+    protected function dispatchEvent(string $eventName, ?object $entity = null, array $data = []): void
+    {
+        try {
+            $app = Application::getInstance();
+            if ($app === null) {
+                return; // Pas d'application disponible, ignorer l'événement
+            }
+            
+            $events = $app->getEvents();
+            if ($events === null) {
+                return; // Pas de EventDispatcher disponible
+            }
+            
+            $event = new ApiEvent($eventName, $entity, array_merge($data, [
+                'entityClass' => $this->entityClass,
+            ]));
+            
+            $events->dispatch($eventName, [
+                'event' => $event,
+                'entity' => $entity,
+                'data' => $data,
+            ]);
+        } catch (\Throwable $e) {
+            // Ne pas faire échouer la requête si le dispatch d'événement échoue
+            // Log l'erreur si possible, mais continue l'exécution
+        }
     }
 }
