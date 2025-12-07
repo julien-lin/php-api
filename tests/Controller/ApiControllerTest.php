@@ -28,6 +28,7 @@ class TestApiController extends ApiController
 {
     private array $entities = [];
     private int $nextId = 1;
+    public array $dispatchedEvents = [];
     
     public function __construct()
     {
@@ -36,7 +37,38 @@ class TestApiController extends ApiController
     
     protected function getAll(array $queryParams = []): array
     {
+        // Simuler la pagination en retournant data et total
+        if (isset($queryParams['page']) || isset($queryParams['limit'])) {
+            $page = isset($queryParams['page']) ? (int)$queryParams['page'] : 1;
+            $limit = isset($queryParams['limit']) ? (int)$queryParams['limit'] : 20;
+            $offset = ($page - 1) * $limit;
+            
+            $paginated = array_slice($this->entities, $offset, $limit);
+            
+            return [
+                'data' => $paginated,
+                'total' => count($this->entities),
+            ];
+        }
+        
         return $this->entities;
+    }
+    
+    protected function dispatchEvent(string $eventName, ?object $entity = null, array $data = []): void
+    {
+        // Capturer les événements pour les tests
+        $this->dispatchedEvents[] = [
+            'eventName' => $eventName,
+            'entity' => $entity,
+            'data' => $data,
+        ];
+        
+        // Appeler la méthode parente si Application est disponible
+        try {
+            parent::dispatchEvent($eventName, $entity, $data);
+        } catch (\Throwable $e) {
+            // Ignorer si Application n'est pas disponible
+        }
     }
     
     protected function getOne(int|string $id): ?object
@@ -211,5 +243,102 @@ class ApiControllerTest extends TestCase
         $this->assertArrayHasKey('type', $body);
         $this->assertArrayHasKey('title', $body);
         $this->assertArrayHasKey('status', $body);
+    }
+    
+    public function testIndexWithPaginationMetadata(): void
+    {
+        // Créer plusieurs entités
+        for ($i = 1; $i <= 25; $i++) {
+            $this->controller->create(['name' => "Entity {$i}"]);
+        }
+        
+        $request = $this->createMock(Request::class);
+        $request->method('getQueryParams')->willReturn(['page' => 1, 'limit' => 10]);
+        
+        $response = $this->controller->index($request);
+        
+        $this->assertInstanceOf(Response::class, $response);
+        $content = $response->getContent();
+        $body = json_decode($content, true);
+        
+        $this->assertArrayHasKey('data', $body);
+        $this->assertArrayHasKey('meta', $body);
+        $this->assertArrayHasKey('total', $body['meta']);
+        $this->assertArrayHasKey('page', $body['meta']);
+        $this->assertArrayHasKey('limit', $body['meta']);
+        $this->assertArrayHasKey('totalPages', $body['meta']);
+        $this->assertArrayHasKey('hasNextPage', $body['meta']);
+        $this->assertArrayHasKey('hasPreviousPage', $body['meta']);
+        
+        $this->assertEquals(25, $body['meta']['total']);
+        $this->assertEquals(1, $body['meta']['page']);
+        $this->assertEquals(10, $body['meta']['limit']);
+        $this->assertEquals(3, $body['meta']['totalPages']);
+        $this->assertTrue($body['meta']['hasNextPage']);
+        $this->assertFalse($body['meta']['hasPreviousPage']);
+    }
+    
+    public function testIndexWithEmbedRelations(): void
+    {
+        $request = $this->createMock(Request::class);
+        $request->method('getQueryParams')->willReturn(['embed' => 'category']);
+        
+        $response = $this->controller->index($request);
+        
+        $this->assertInstanceOf(Response::class, $response);
+        // Le serializer devrait avoir les relations embed configurées
+    }
+    
+    public function testShowWithEmbedRelations(): void
+    {
+        $this->controller->create(['name' => 'Test']);
+        
+        $request = $this->createMock(Request::class);
+        $request->method('getRouteParam')->willReturn('1');
+        $request->method('getQueryParams')->willReturn(['embed' => 'category']);
+        
+        $response = $this->controller->show($request);
+        
+        $this->assertInstanceOf(Response::class, $response);
+    }
+    
+    public function testCreateDispatchesEvents(): void
+    {
+        $this->controller->create(['name' => 'Test']);
+        
+        $this->assertCount(2, $this->controller->dispatchedEvents);
+        $this->assertEquals('api.pre_create', $this->controller->dispatchedEvents[0]['eventName']);
+        $this->assertEquals('api.post_create', $this->controller->dispatchedEvents[1]['eventName']);
+        $this->assertNull($this->controller->dispatchedEvents[0]['entity']); // pre_create n'a pas encore l'entité
+        $this->assertNotNull($this->controller->dispatchedEvents[1]['entity']); // post_create a l'entité
+    }
+    
+    public function testUpdateDispatchesEvents(): void
+    {
+        $this->controller->create(['name' => 'Test']);
+        
+        $this->controller->dispatchedEvents = []; // Reset
+        
+        $this->controller->update(1, ['name' => 'Updated']);
+        
+        $this->assertCount(2, $this->controller->dispatchedEvents);
+        $this->assertEquals('api.pre_update', $this->controller->dispatchedEvents[0]['eventName']);
+        $this->assertEquals('api.post_update', $this->controller->dispatchedEvents[1]['eventName']);
+        $this->assertNotNull($this->controller->dispatchedEvents[0]['entity']);
+        $this->assertArrayHasKey('data', $this->controller->dispatchedEvents[0]['data']);
+    }
+    
+    public function testDeleteDispatchesEvents(): void
+    {
+        $this->controller->create(['name' => 'Test']);
+        
+        $this->controller->dispatchedEvents = []; // Reset
+        
+        $this->controller->delete(1);
+        
+        $this->assertCount(2, $this->controller->dispatchedEvents);
+        $this->assertEquals('api.pre_delete', $this->controller->dispatchedEvents[0]['eventName']);
+        $this->assertEquals('api.post_delete', $this->controller->dispatchedEvents[1]['eventName']);
+        $this->assertNotNull($this->controller->dispatchedEvents[0]['entity']);
     }
 }

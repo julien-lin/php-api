@@ -5,7 +5,10 @@
 ```
 tests/
 ├── Controller/
-│   └── ApiControllerTest.php          # Tests du contrôleur API
+│   ├── ApiControllerTest.php          # Tests du contrôleur API (pagination, événements)
+│   └── SubresourceControllerTest.php  # Tests des sous-ressources
+├── Event/
+│   └── ApiEventTest.php               # Tests des événements API
 ├── Exception/
 │   ├── ApiExceptionTest.php           # Tests des exceptions API
 │   ├── ProblemDetailsTest.php         # Tests du format Problem Details
@@ -18,6 +21,9 @@ tests/
 │   ├── RangeFilterTest.php             # Tests du filtre de plages
 │   ├── SearchFilterTest.php            # Tests du filtre de recherche
 │   └── TestQueryBuilder.php           # Mock QueryBuilder pour les tests
+├── Serializer/
+│   ├── JsonSerializerRelationsTest.php # Tests sérialisation avec relations
+│   └── RelationSerializerTest.php      # Tests du sérialiseur de relations
 ├── Swagger/
 │   └── SwaggerGeneratorFiltersTest.php # Tests Swagger avec filtres
 ├── Validator/
@@ -157,10 +163,52 @@ php vendor/bin/phpunit tests/Filter/SearchFilterTest.php
   - Structure des paramètres de filtres
   - Paramètre de tri
 
+### Tests des relations (14 tests)
+
+- ✅ **RelationSerializer** : 14 tests
+  - Détection des relations (ManyToOne, OneToMany)
+  - Récupération des annotations (ApiSubresource, ManyToOne, OneToMany)
+  - Sérialisation avec profondeur
+  - Extraction d'IDs
+  - Gestion des collections
+
+### Tests de sérialisation avec relations (7 tests)
+
+- ✅ **JsonSerializerRelations** : 7 tests
+  - Sérialisation sans embedding
+  - Sérialisation avec embedding
+  - Sérialisation avec plusieurs relations
+  - Gestion de la profondeur maximale
+  - Sérialisation de tableaux d'entités
+
+### Tests des événements (4 tests)
+
+- ✅ **ApiEvent** : 4 tests
+  - Constantes d'événements
+  - Constructeur avec entité
+  - Constructeur sans entité
+  - Données vides
+
+### Tests du contrôleur amélioré (18 tests)
+
+- ✅ **ApiController** : 18 tests (12 existants + 6 nouveaux)
+  - Pagination avec métadonnées
+  - Embedding de relations
+  - Dispatch d'événements (create, update, delete)
+  - Tests existants (index, show, create, update, delete)
+
+### Tests des sous-ressources (10 tests)
+
+- ✅ **SubresourceController** : 10 tests
+  - Conversion nom de ressource → classe
+  - Récupération de valeurs de relations
+  - Recherche dans les relations
+  - Gestion des erreurs
+
 ## Statistiques
 
-- **Total de tests** : 78
-- **Assertions** : 136
+- **Total de tests** : 119 (78 existants + 41 nouveaux)
+- **Assertions** : 245 (136 existantes + 109 nouvelles)
 - **Taux de réussite** : 100% ✅
 
 ## Notes

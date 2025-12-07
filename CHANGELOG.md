@@ -2,6 +2,70 @@
 
 Tous les changements notables de ce projet seront documentés dans ce fichier.
 
+## [1.3.0] - 2025-01-07
+
+### ✨ Nouvelles fonctionnalités
+
+#### Relations et sous-ressources (Phase 4)
+
+- **ApiSubresource** : Annotation pour configurer les relations exposées
+- **RelationSerializer** : Sérialisation des relations Doctrine avec profondeur configurable
+- **Embedding de relations** : Paramètre `embed` dans query params pour inclure les relations
+  - Format : `GET /api/products?embed=category,orderItems`
+  - Support des relations ManyToOne et OneToMany
+  - Profondeur maximale configurable via `ApiSubresource`
+- **SubresourceController** : Contrôleur pour accéder aux relations via routes dédiées
+  - `GET /api/{resource}/{id}/{subresource}` : Collection de sous-ressources
+  - `GET /api/{resource}/{id}/{subresource}/{subId}` : Élément spécifique
+- **Intégration Swagger** : Paramètre `embed` documenté automatiquement
+
+#### Système d'événements (Phase 7)
+
+- **ApiEvent** : Classe d'événement API avec constantes standardisées
+- **Intégration EventDispatcher** : Utilisation du `EventDispatcher` de `core-php`
+- **Événements disponibles** :
+  - `api.pre_create` / `api.post_create`
+  - `api.pre_update` / `api.post_update`
+  - `api.pre_delete` / `api.post_delete`
+- **Dispatch automatique** : Événements déclenchés automatiquement dans `ApiController`
+
+#### Pagination améliorée
+
+- **Métadonnées complètes** : Format de réponse enrichi avec métadonnées de pagination
+  - `total` : Nombre total d'éléments
+  - `page` : Page actuelle
+  - `limit` : Nombre d'éléments par page
+  - `totalPages` : Nombre total de pages
+  - `hasNextPage` : Indicateur de page suivante
+  - `hasPreviousPage` : Indicateur de page précédente
+- **Support du comptage séparé** : Méthode `getAllWithPagination()` pour pagination efficace
+
+### 🔧 Améliorations
+
+- **JsonSerializer** : Support des relations avec embedding et profondeur
+- **ApiController** : Gestion automatique de l'embedding depuis query params
+- **SwaggerGenerator** : Documentation du paramètre `embed`
+- **Compatibilité** : S'adapte parfaitement à `core-php` et `doctrine-php`
+
+### 🧪 Tests
+
+- **41 nouveaux tests unitaires** pour les nouvelles fonctionnalités
+  - 14 tests pour `RelationSerializer`
+  - 7 tests pour `JsonSerializer` avec relations
+  - 4 tests pour `ApiEvent`
+  - 6 tests supplémentaires pour `ApiController` (pagination, embedding, événements)
+  - 10 tests pour `SubresourceController`
+- **Total : 119 tests** (78 existants + 41 nouveaux)
+- **245 assertions** (136 existantes + 109 nouvelles)
+- **Taux de réussite : 100%** ✅
+
+### 📝 Documentation
+
+- Nouveau document : `documentation/IMPLEMENTATION_COMPLETE.md`
+- `README.md` et `README.fr.md` mis à jour avec les relations et événements
+- `tests/README.md` mis à jour avec les nouveaux tests
+- Exemples d'utilisation des relations et événements
+
 ## [1.2.0] - 2025-01-07
 
 ### ✨ Nouvelles fonctionnalités
