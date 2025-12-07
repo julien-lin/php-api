@@ -86,7 +86,12 @@ abstract class ApiController extends Controller
         } catch (ValidationException $e) {
             throw $e;
         } catch (\Throwable $e) {
-            throw new ApiException('Erreur lors de la récupération des ressources', 500, $e);
+            // Inclure le message d'erreur original pour le debugging
+            $message = 'Erreur lors de la récupération des ressources';
+            if ($e->getMessage()) {
+                $message .= ': ' . $e->getMessage();
+            }
+            throw new ApiException($message, 500, $e);
         }
     }
 

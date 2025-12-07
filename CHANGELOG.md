@@ -2,6 +2,17 @@
 
 Tous les changements notables de ce projet seront documentés dans ce fichier.
 
+## [1.3.2] - 2025-01-07
+
+### 🐛 Corrections
+
+- **ApiController** : Amélioration de la gestion des erreurs pour inclure le message d'erreur original
+  - Le message d'erreur original est maintenant inclus dans l'ApiException pour faciliter le debugging
+  - Format : "Erreur lors de la récupération des ressources: [message original]"
+- **ProblemDetails** : Ajout des détails de l'exception précédente dans les extensions
+  - En cas d'exception chaînée, les détails (message, fichier, ligne, trace) sont inclus dans `extensions.previous`
+  - Facilite le debugging en mode production
+
 ## [1.3.1] - 2025-01-07
 
 ### 🐛 Corrections
