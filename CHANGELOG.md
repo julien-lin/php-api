@@ -2,6 +2,16 @@
 
 Tous les changements notables de ce projet seront documentés dans ce fichier.
 
+## [1.3.1] - 2025-01-07
+
+### 🐛 Corrections
+
+- **SwaggerGenerator** : Correction de l'affichage des paramètres de filtres dans Swagger UI
+  - Suppression de `deepObject` avec `explode: true` qui générait tous les sous-paramètres par défaut
+  - Simplification des paramètres de filtres (SearchFilter, DateFilter, RangeFilter) en format string
+  - Correction du paramètre `order` pour éviter les URLs trop longues
+  - Résolution de l'erreur 500 lors de l'exécution depuis Swagger UI
+
 ## [1.3.0] - 2025-01-07
 
 ### ✨ Nouvelles fonctionnalités
