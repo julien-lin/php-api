@@ -10,6 +10,8 @@ Bibliothèque PHP pour créer des APIs REST automatiques, inspirée d'API Platfo
 - ✅ **Support des relations Doctrine** : Relations ManyToOne, OneToMany, etc.
 - ✅ **Filtrage et pagination** : Support des paramètres de requête
 - ✅ **Validation des données** : Intégration avec le validateur
+- ✅ **Documentation Swagger/OpenAPI automatique** : Génération depuis les annotations
+- ✅ **Interface Swagger UI interactive** : Testez votre API directement dans le navigateur
 - ✅ **Intégration Core PHP** : Utilise le système de contrôleurs existant
 
 ## 📦 Installation
@@ -208,6 +210,47 @@ Alternative simple pour définir les groupes.
 #[Groups(['read', 'write'])]
 public string $name;
 ```
+
+## 📖 Documentation Swagger/OpenAPI
+
+### Configuration
+
+Ajoutez le contrôleur Swagger pour générer automatiquement la documentation :
+
+```php
+use JulienLinard\Api\Controller\SwaggerController;
+use App\Entity\Product;
+use App\Entity\User;
+
+// Créer le contrôleur Swagger
+$swaggerController = new SwaggerController(
+    entityClasses: [Product::class, User::class], // Liste des entités exposées
+    title: 'Mon API',
+    version: '1.0.0',
+    basePath: '/api'
+);
+
+// Routes pour la documentation
+$router->get('/api/docs', [$swaggerController, 'ui']);        // Interface Swagger UI
+$router->get('/api/docs.json', [$swaggerController, 'json']);  // Spec OpenAPI JSON
+$router->get('/api/docs.yaml', [$swaggerController, 'yaml']);  // Spec OpenAPI YAML
+```
+
+### Utilisation
+
+1. **Accédez à `/api/docs`** pour voir l'interface Swagger UI interactive
+2. **Explorez les entités** : Toutes les entités avec `#[ApiResource]` sont automatiquement documentées
+3. **Testez les requêtes** : Utilisez l'interface "Try it out" pour tester directement les endpoints
+4. **Voyez les schémas** : Les propriétés et leurs types sont automatiquement détectés
+
+### Fonctionnalités
+
+- ✅ **Génération automatique** : La documentation est générée depuis vos annotations
+- ✅ **Interface interactive** : Testez vos endpoints directement dans le navigateur
+- ✅ **Schémas complets** : Types, descriptions, propriétés requises
+- ✅ **Support des opérations** : GET, POST, PUT, PATCH, DELETE
+- ✅ **Pagination** : Paramètres de pagination automatiquement documentés
+- ✅ **Export JSON/YAML** : Récupérez la spec OpenAPI pour d'autres outils
 
 ## 🔧 Personnalisation
 

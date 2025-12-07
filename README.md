@@ -10,6 +10,8 @@ Bibliothèque PHP pour créer des APIs REST automatiques, inspirée d'API Platfo
 - ✅ Support des relations Doctrine
 - ✅ Filtrage et pagination
 - ✅ Validation des données
+- ✅ **Documentation Swagger/OpenAPI automatique**
+- ✅ **Interface Swagger UI pour tester l'API**
 - ✅ Intégration avec le Core PHP existant
 
 ## Installation
@@ -84,6 +86,31 @@ $router->post('/api/users', [UserController::class, 'create']);
 $router->put('/api/users/{id}', [UserController::class, 'update']);
 $router->delete('/api/users/{id}', [UserController::class, 'delete']);
 ```
+
+### 4. Ajouter la documentation Swagger (optionnel)
+
+```php
+use JulienLinard\Api\Controller\SwaggerController;
+
+// Créer le contrôleur Swagger avec vos entités
+$swaggerController = new SwaggerController(
+    entityClasses: [User::class, Product::class], // Liste des entités exposées
+    title: 'Mon API',
+    version: '1.0.0',
+    basePath: '/api'
+);
+
+// Routes pour la documentation
+$router->get('/api/docs', [$swaggerController, 'ui']);        // Interface Swagger UI
+$router->get('/api/docs.json', [$swaggerController, 'json']);  // Spec OpenAPI JSON
+$router->get('/api/docs.yaml', [$swaggerController, 'yaml']);  // Spec OpenAPI YAML
+```
+
+Accédez à `/api/docs` pour voir l'interface Swagger UI interactive où vous pouvez :
+- Voir toutes les entités exposées
+- Voir toutes les opérations disponibles (GET, POST, PUT, DELETE, PATCH)
+- Tester les requêtes directement dans le navigateur
+- Voir les schémas de données
 
 ## Documentation
 
