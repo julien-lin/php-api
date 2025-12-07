@@ -243,16 +243,11 @@ class SwaggerGenerator
         $operation['parameters'][] = [
             'name' => 'order',
             'in' => 'query',
-            'description' => 'Tri par propriétés (ex: order[price]=desc&order[name]=asc)',
+            'description' => 'Tri par propriétés. Format: order[price]=desc&order[name]=asc',
             'required' => false,
-            'style' => 'deepObject',
-            'explode' => true,
             'schema' => [
-                'type' => 'object',
-                'additionalProperties' => [
-                    'type' => 'string',
-                    'enum' => ['asc', 'desc'],
-                ],
+                'type' => 'string',
+                'example' => 'order[price]=desc&order[name]=asc',
             ],
         ];
         
@@ -291,59 +286,39 @@ class SwaggerGenerator
             
             foreach ($apiFilter->properties as $property) {
                 // Générer le paramètre selon le type de filtre
+                // Utiliser un format simple sans deepObject pour éviter que Swagger génère tous les sous-paramètres
                 if ($filterClass === SearchFilter::class) {
                     $parameters[] = [
                         'name' => $property,
                         'in' => 'query',
-                        'description' => "Recherche dans {$property} (ex: {$property}[partial]=value, {$property}[exact]=value)",
+                        'description' => "Recherche dans {$property}. Format: {$property}[partial]=value, {$property}[exact]=value, {$property}[start]=value, {$property}[end]=value, {$property}[word_start]=value",
                         'required' => false,
-                        'style' => 'deepObject',
-                        'explode' => true,
                         'schema' => [
-                            'type' => 'object',
-                            'properties' => [
-                                'exact' => ['type' => 'string'],
-                                'partial' => ['type' => 'string'],
-                                'start' => ['type' => 'string'],
-                                'end' => ['type' => 'string'],
-                                'word_start' => ['type' => 'string'],
-                            ],
+                            'type' => 'string',
+                            'example' => "{$property}[partial]=value",
                         ],
                     ];
                 } elseif ($filterClass === DateFilter::class) {
                     $parameters[] = [
                         'name' => $property,
                         'in' => 'query',
-                        'description' => "Filtre par date pour {$property} (ex: {$property}[after]=2025-01-01)",
+                        'description' => "Filtre par date pour {$property}. Format: {$property}[after]=2025-01-01, {$property}[before]=2025-12-31, {$property}[exact]=2025-06-15",
                         'required' => false,
-                        'style' => 'deepObject',
-                        'explode' => true,
                         'schema' => [
-                            'type' => 'object',
-                            'properties' => [
-                                'exact' => ['type' => 'string', 'format' => 'date'],
-                                'before' => ['type' => 'string', 'format' => 'date'],
-                                'after' => ['type' => 'string', 'format' => 'date'],
-                            ],
+                            'type' => 'string',
+                            'format' => 'date',
+                            'example' => "{$property}[after]=2025-01-01",
                         ],
                     ];
                 } elseif ($filterClass === RangeFilter::class) {
                     $parameters[] = [
                         'name' => $property,
                         'in' => 'query',
-                        'description' => "Filtre par plage pour {$property} (ex: {$property}[gte]=100&{$property}[lte]=500)",
+                        'description' => "Filtre par plage pour {$property}. Format: {$property}[gte]=100, {$property}[lte]=500, {$property}[gt]=50, {$property}[lt]=1000, {$property}[between]=100,500",
                         'required' => false,
-                        'style' => 'deepObject',
-                        'explode' => true,
                         'schema' => [
-                            'type' => 'object',
-                            'properties' => [
-                                'gt' => ['type' => 'number'],
-                                'gte' => ['type' => 'number'],
-                                'lt' => ['type' => 'number'],
-                                'lte' => ['type' => 'number'],
-                                'between' => ['type' => 'string', 'description' => 'Format: min,max'],
-                            ],
+                            'type' => 'string',
+                            'example' => "{$property}[gte]=100&{$property}[lte]=500",
                         ],
                     ];
                 } elseif ($filterClass === BooleanFilter::class) {
