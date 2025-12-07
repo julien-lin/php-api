@@ -119,6 +119,17 @@ class ProblemDetails
             $extensions['violations'] = $exception->getViolations();
         }
         
+        // En mode debug, ajouter la trace de l'exception précédente si elle existe
+        if ($exception instanceof ApiException && $exception->getPrevious() !== null) {
+            $previous = $exception->getPrevious();
+            $extensions['previous'] = [
+                'message' => $previous->getMessage(),
+                'file' => $previous->getFile(),
+                'line' => $previous->getLine(),
+                'trace' => $previous->getTraceAsString(),
+            ];
+        }
+        
         return new self(
             type: $type,
             title: $title,
