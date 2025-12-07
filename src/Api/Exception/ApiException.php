@@ -11,16 +11,27 @@ use Exception;
  */
 class ApiException extends Exception
 {
+    private int $statusCode;
+    
     /**
      * @param string $message Message d'erreur
-     * @param int $code Code HTTP
+     * @param int $statusCode Code HTTP
      * @param \Throwable|null $previous Exception précédente
      */
     public function __construct(
         string $message = '',
-        int $code = 500,
+        int $statusCode = 500,
         ?\Throwable $previous = null
     ) {
-        parent::__construct($message, $code, $previous);
+        parent::__construct($message, 0, $previous);
+        $this->statusCode = $statusCode;
+    }
+    
+    /**
+     * Récupère le code de statut HTTP
+     */
+    public function getStatusCode(): int
+    {
+        return $this->statusCode;
     }
 }

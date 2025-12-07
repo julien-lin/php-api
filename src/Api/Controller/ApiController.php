@@ -10,6 +10,9 @@ use JulienLinard\Router\Request;
 use JulienLinard\Api\Serializer\JsonSerializer;
 use JulienLinard\Api\Exception\ApiException;
 use JulienLinard\Api\Exception\NotFoundException;
+use JulienLinard\Api\Exception\ValidationException;
+use JulienLinard\Api\Exception\ProblemDetails;
+use JulienLinard\Api\Validator\ApiValidator;
 
 /**
  * Contrôleur de base pour les APIs REST
@@ -20,15 +23,18 @@ abstract class ApiController extends Controller
 {
     protected JsonSerializer $serializer;
     protected string $entityClass;
+    protected ?ApiValidator $validator;
 
     /**
      * @param string $entityClass Classe de l'entité
      * @param JsonSerializer $serializer Sérialiseur JSON
+     * @param ApiValidator|null $validator Validateur (optionnel)
      */
-    public function __construct(string $entityClass, JsonSerializer $serializer)
+    public function __construct(string $entityClass, JsonSerializer $serializer, ?ApiValidator $validator = null)
     {
         $this->entityClass = $entityClass;
         $this->serializer = $serializer;
+        $this->validator = $validator ?? new ApiValidator();
     }
 
     /**
@@ -51,6 +57,8 @@ abstract class ApiController extends Controller
                 'data' => $data,
                 'total' => count($entities),
             ]);
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             throw new ApiException('Erreur lors de la récupération des ressources', 500, $e);
         }
@@ -84,6 +92,8 @@ abstract class ApiController extends Controller
             return $this->json(['data' => $data]);
         } catch (NotFoundException $e) {
             throw $e;
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             throw new ApiException('Erreur lors de la récupération de la ressource', 500, $e);
         }
@@ -106,12 +116,17 @@ abstract class ApiController extends Controller
                 throw new \InvalidArgumentException('Données manquantes');
             }
             
+            // Valider les données
+            $this->validator->validate($data, $this->entityClass, ['create', 'Default']);
+            
             $entity = $this->createEntity($data);
             $this->save($entity);
 
             $serialized = $this->serializer->serialize($entity, ['read']);
 
             return $this->json(['data' => $serialized], 201);
+        } catch (ValidationException $e) {
+            throw $e;
         } catch (\Throwable $e) {
             throw new ApiException('Erreur lors de la création de la ressource', 400, $e);
         }
@@ -141,6 +156,9 @@ abstract class ApiController extends Controller
                 throw new \InvalidArgumentException('Données manquantes');
             }
             
+            // Valider les données
+            $this->validator->validate($data, $this->entityClass, ['update', 'Default']);
+            
             $entity = $this->getOne((int)$id);
             
             if ($entity === null) {
@@ -154,6 +172,8 @@ abstract class ApiController extends Controller
 
             return $this->json(['data' => $serialized]);
         } catch (NotFoundException $e) {
+            throw $e;
+        } catch (ValidationException $e) {
             throw $e;
         } catch (\Throwable $e) {
             throw new ApiException('Erreur lors de la mise à jour de la ressource', 400, $e);
@@ -316,5 +336,18 @@ abstract class ApiController extends Controller
         // $em = $this->app()->getEntityManager();
         // $em->remove($entity);
         // $em->flush();
+    }
+    
+    /**
+     * Retourne une réponse d'erreur au format Problem Details (RFC 7807)
+     * 
+     * @param \Throwable $exception
+     * @param string|null $baseUrl URL de base pour l'instance
+     * @return Response
+     */
+    protected function errorResponse(\Throwable $exception, ?string $baseUrl = null): Response
+    {
+        $problem = ProblemDetails::fromException($exception, $baseUrl);
+        return $this->json($problem->toArray(), $problem->status);
     }
 }
